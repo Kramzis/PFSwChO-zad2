@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lamp
+  labels:
+    app: apache-pod
+spec:
+  ports:
+    - port: 8080
+      targetPort: 80
+  selector:
+    app: apache-pod
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lamp-pv-claim
+  labels:
+    app: apache-pod
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apache-pod
+  labels:
+    app: apache-pod
+spec:
+  selector:
+    matchLabels:
+      app: apache-pod
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: apache-pod
+    spec:
+      containers:
+      - image: kramzis01/apache-mysql:1.0
+        imagePullPolicy: Always
+        name: apache-pod
+        env:
+        - name: LAMP_DB
+          value: lamp-mysql
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: password
+        - name: USER
+          value: root
+        ports:
+        - containerPort: 80
+          name: apache-pod
+        volumeMounts:
+        - name: lamp-persistent-storage
+          mountPath: /app/files
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: lamp-persistent-storage
+        persistentVolumeClaim:
+          claimName: lamp-pv-claim
